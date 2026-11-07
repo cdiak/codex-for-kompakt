@@ -1,0 +1,10 @@
+[
+  {
+    "name": "org.commonmark:commonmark",
+    "version": "0.22.0",
+    "url": "https://repo.maven.apache.org/maven2/org/commonmark/commonmark/0.22.0/commonmark-0.22.0.jar",
+    "sha256": "3417909f2997bc8c61d90d64c6af29f4a3f5b6729caceaef97221ceac93df814",
+    "license": "BSD-2-Clause",
+    "license_file": "android/assets/licenses/commonmark-LICENSE.txt"
+  }
+]

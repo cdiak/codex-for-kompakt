@@ -1,0 +1,32 @@
+{
+  "device": "Mudita Kompakt",
+  "firmware": "MuditaOS K 1.1.1",
+  "android": 12,
+  "api": 31,
+  "screen": [
+    480,
+    800
+  ],
+  "apk_bytes": 586291,
+  "measured_pss_kb": 44405,
+  "unit_tests_passed": 14,
+  "transport": "TLS over ADB USB reverse; localhost only",
+  "live_result": "Hello from Kompakt",
+  "user_approvals_received": 3,
+  "production_release": false,
+  "app_name": "Codex",
+  "in_app_title": "Codex for Kompakt",
+  "version": "0.2.0",
+  "apk_sha256": "36ec9af90036ba48c29642946922ecebeab9c85a5ebc32a62a1257b5fa4b20ab",
+  "chat_history_verified": true,
+  "live_context_resume_verified": true,
+  "markdown_visually_verified": [
+    "heading",
+    "bold",
+    "italic",
+    "bullets",
+    "fenced Python code with Copy control"
+  ],
+  "dictation_implemented": false,
+  "whisper_benchmarked": false
+}

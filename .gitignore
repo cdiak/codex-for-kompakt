@@ -1,0 +1,24 @@
+# Local build tools, generated artifacts, and runtime state
+work/
+runtime/
+dist/
+build/
+__pycache__/
+*.pyc
+*.apk
+*.idsig
+*.keystore
+*.jks
+*.key
+*.pem
+*.crt
+*.log
+*.pid
+.DS_Store
+.env
+.env.*
+pairing.json
+state.json
+chats.json
+token
+certificate.cnf

@@ -1,0 +1,22 @@
+[
+  {
+    "archive": "jdk.tar.gz",
+    "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21%2B9/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.21_9.tar.gz",
+    "sha256": "78b08c7f5a0598242d5719c022e19479cb4a3aa45c37c19726a757a469ed1c15"
+  },
+  {
+    "archive": "platform.zip",
+    "url": "https://dl.google.com/android/repository/platform-35_r02.zip",
+    "sha256": "0988cacad01b38a18a47bac14a0695f246bc76c1b06c0eeb8eb0dc825ab0c8e0"
+  },
+  {
+    "archive": "build-tools.zip",
+    "url": "https://dl.google.com/android/repository/build-tools_r35_macosx.zip",
+    "sha256": "530cdbd1ec315e1477624d7ed2f0f2962108d69f36eddba5894cef9ea2cedb48"
+  },
+  {
+    "archive": "platform-tools.zip",
+    "url": "https://dl.google.com/android/repository/platform-tools-latest-darwin.zip",
+    "sha256": "ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d"
+  }
+]
