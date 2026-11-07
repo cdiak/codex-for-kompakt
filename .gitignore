@@ -22,3 +22,5 @@ state.json
 chats.json
 token
 certificate.cnf
+*.so
+ggml-*.bin

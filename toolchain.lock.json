@@ -18,5 +18,11 @@
     "archive": "platform-tools.zip",
     "url": "https://dl.google.com/android/repository/platform-tools-latest-darwin.zip",
     "sha256": "ee39ad5967e95c2a07f04dbcbde96b1a0c916ba376096db5d2f498b7727a5d1d"
+  },
+  {
+    "archive": "android-ndk-r30-darwin.zip",
+    "url": "https://dl.google.com/android/repository/android-ndk-r30-darwin.zip",
+    "sha256": "d125634de97b26deb1e1bb1a562f9d839aa5803d1784a1e414485f5ccbe6739f",
+    "upstream_sha1": "c060be96767eefbb8e0a27796d6f43115fc1a0c4"
   }
 ]

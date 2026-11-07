@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -114,6 +115,11 @@ public final class MainActivity extends Activity {
         requestText = getPreferences(0).getString("pendingText", "");
         newConversation = getPreferences(0).getBoolean("pendingNew", false);
         input.addView(composer, new LinearLayout.LayoutParams(0, -2, 1));
+        IconButton microphone = new IconButton("microphone", "Dictate a message", v -> {
+            ((InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(composer.getWindowToken(), 0);
+            startActivityForResult(new Intent(this, DictationActivity.class).putExtra("record", true), 41);
+        });
+        input.addView(microphone, new LinearLayout.LayoutParams(dp(36), dp(46)));
         send = new IconButton("send", "Send message", v -> {
             if (state == null || !state.optBoolean("busy")) { submit(); return; }
             new AlertDialog.Builder(this).setTitle("Stop this task?")
@@ -148,6 +154,18 @@ public final class MainActivity extends Activity {
     }
 
     @Override public void onResume() { super.onResume(); foreground = true; handler.post(poll); }
+    @Override protected void onActivityResult(int request, int result, Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request == 41 && result == RESULT_OK && data != null) {
+            String text = data.getStringExtra("text");
+            if (text == null || text.isEmpty()) return;
+            int start = Math.max(0, composer.getSelectionStart()), end = Math.max(start, composer.getSelectionEnd());
+            if (start > 0 && !Character.isWhitespace(composer.getText().charAt(start - 1))) text = " " + text;
+            if (end < composer.length() && !Character.isWhitespace(composer.getText().charAt(end))) text += " ";
+            composer.getText().replace(start, end, text);
+            getPreferences(0).edit().putString("draft", composer.getText().toString()).apply();
+        }
+    }
     @Override public void onPause() {
         foreground = false; handler.removeCallbacks(poll);
         getPreferences(0).edit().putString("draft", composer.getText().toString()).apply();
@@ -182,6 +200,10 @@ public final class MainActivity extends Activity {
                 for (int i=-1;i<=1;i++) c.drawLine(x-r,y+i*dp(6),x+r,y+i*dp(6),paint);
             } else if (kind.equals("new")) {
                 c.drawLine(x-r,y,x+r,y,paint); c.drawLine(x,y-r,x,y+r,paint);
+            } else if (kind.equals("microphone")) {
+                c.drawRoundRect(x-dp(4),y-dp(10),x+dp(4),y+dp(3),dp(4),dp(4),paint);
+                c.drawArc(x-dp(8),y-dp(6),x+dp(8),y+dp(8),0,180,false,paint);
+                c.drawLine(x,y+dp(8),x,y+dp(12),paint);c.drawLine(x-dp(4),y+dp(12),x+dp(4),y+dp(12),paint);
             } else {
                 paint.setStyle(Paint.Style.FILL); c.drawCircle(x,y,dp(18),paint); paint.setColor(Color.WHITE);
                 if (kind.equals("stop")) c.drawRoundRect(x-dp(6),y-dp(6),x+dp(6),y+dp(6),dp(1),dp(1),paint);
@@ -376,6 +398,14 @@ public final class MainActivity extends Activity {
         changes.setBackgroundColor(Color.TRANSPARENT); box.addView(changes, new LinearLayout.LayoutParams(-1, dp(44)));
         Button connect = button("Connection", v -> { drawer.dismiss(); showConnection(); }); connect.setBackgroundColor(Color.TRANSPARENT);
         box.addView(connect, new LinearLayout.LayoutParams(-1, dp(44)));
+        Button voice = button("SMS microphone", v -> {
+            drawer.dismiss();
+            new AlertDialog.Builder(this).setTitle("SMS microphone")
+                .setMessage("Enable SMS microphone in Accessibility settings to add a small microphone beside the SMS composer. Android grants screen-access capability; this feature uses only the SMS draft field. It never sends messages. Your Mudita keyboard stays selected.")
+                .setPositiveButton("Accessibility settings", (d,w) -> startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)))
+                .setNegativeButton("Close",null).show();
+        });
+        voice.setBackgroundColor(Color.TRANSPARENT); box.addView(voice, new LinearLayout.LayoutParams(-1, dp(44)));
         drawer.setContentView(box); drawer.show(); drawer.getWindow().setGravity(Gravity.LEFT);
         drawer.getWindow().setLayout((int)(getResources().getDisplayMetrics().widthPixels*0.94), -1);
         if (!connected) { groups.removeAllViews(); groups.addView(text("Connect to your Mac to load previous chats.", 16)); return; }

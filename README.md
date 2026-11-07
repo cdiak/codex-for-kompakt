@@ -21,7 +21,7 @@ Photos of the working prototype on the physical phone, connected to the Mac over
 
 ## Status
 
-Version **0.2.0** has been built, sideloaded, and tested on a Kompakt running MuditaOS K 1.1.1 / Android 12 (API 31), with a 480 × 800 display and approximately 3 GB RAM. The development APK was about **0.59 MB**, including its icon and Markdown parser. A foreground measurement showed approximately **43 MiB PSS**.
+Version **0.3.0** adds local Whisper dictation to the native client. It targets a Kompakt running MuditaOS K 1.1.1 / Android 12 (API 31), with a 480 × 800 display and approximately 3 GB RAM. The development APK is about **33.4 MB**, including the speech model. The earlier UI-only 0.2 build was about 0.59 MB. The photos above show that earlier build.
 
 **USB only today.** The Mac companion listens on `127.0.0.1:39443`, and ADB reverse carries the phone's HTTPS connection to it. Wi-Fi, cellular access, and background notifications are not implemented. The Mac must remain awake, online, and running the companion.
 
@@ -34,6 +34,8 @@ Version **0.2.0** has been built, sideloaded, and tested on a Kompakt running Mu
 - Read Markdown headings, bold/italic text, lists, quotes, inline code, and code boxes with Copy.
 - Use an e-ink-friendly interface with a chat drawer, rounded composer, send arrow, stop control, and expandable command details.
 - View diffs when emitted by Codex; shell-created files do not always produce a diff event.
+- Dictate English tasks using the microphone beside the send arrow, then review the text before sending.
+- Enable an optional **SMS microphone** beside the Mudita Messages composer. It keeps the existing keyboard and inserts text only; it never sends a message.
 
 The companion manages its own conversations in one configured project. It does not import the desktop app's conversations or cloud tasks. Markdown is rendered with CommonMark into native Android controls, not OpenAI's proprietary renderer; tables and syntax coloring are not implemented.
 
@@ -62,15 +64,19 @@ work/toolchain/
   android/platform-tools/adb          # Android platform-tools
 ```
 
-Download and extract the archives into this layout. No Gradle, Google services, or WebView is required. CommonMark Java 0.22.0 is included under `android/libs`; its checksum and license are recorded in [`dependencies.lock.json`](dependencies.lock.json).
+Download and extract the archives into this layout. Voice builds also require CMake 3.16+ and Android NDK r30 under `work/toolchain/ndk/android-ndk-r30`. No Gradle, Google services, or WebView is required. CommonMark Java 0.22.0 is included under `android/libs`; its checksum and the pinned speech dependency checksums are recorded in [`dependencies.lock.json`](dependencies.lock.json).
 
 From the repository root:
 
 ```sh
+python3 tools/fetch_voice.py
 python3 build.py \
   --toolchain work/toolchain \
   --work work/android-build \
-  --output dist/Codex.apk
+  --output dist/Codex.apk \
+  --ndk work/toolchain/ndk/android-ndk-r30 \
+  --whisper-source work/voice/whisper.cpp-1.9.5 \
+  --model work/voice/ggml-tiny.en-q5_1.bin
 
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_companion
 ```
@@ -127,14 +133,16 @@ To revoke a phone, stop the companion, replace the pairing token, and pair only 
 
 ## Local dictation
 
-Not implemented yet. Local Whisper looks feasible on memory: upstream [whisper.cpp](https://github.com/ggml-org/whisper.cpp#memory-usage) lists tiny at 75 MiB on disk and approximately 273 MB memory. Actual latency, Android memory use, battery use, and coding vocabulary accuracy still need measurement on the Kompakt.
+Whisper tiny.en Q5_1 runs locally through an ARM64 whisper.cpp JNI library. The phone transcribed 4.55-second and 11-second test samples in approximately **5.7 seconds** each, using about **101 MiB peak RSS** in the command-line benchmark. The app's native engine processed the shorter sample in **4.9 seconds**. These are spot checks; names and code identifiers can still need correction.
 
-The proposed first version uses `tiny.en` or multilingual `tiny` through an ARM64 NDK/JNI build: record 15–30 seconds, stop, transcribe locally, edit in the composer, then explicitly send. Audio would stay on the phone and be discarded after transcription or cancellation. No Whisper model is bundled in 0.2.
+Tap the microphone, record up to 30 seconds, stop, review, then use the text. The optional accessibility service adds a small microphone beside the Messages composer, without modifying the SMS app or replacing its keyboard. Android accessibility grants broad screen access; this implementation only reads or changes the Mudita SMS draft field after you initiate dictation. It requests no SMS/contact permissions and never presses Send. Recordings remain in memory on the phone and are discarded after processing or cancellation. No speech API or OpenAI API key is used.
+
+See [voice typing setup, measurements, and limitations](docs/voice-typing.md).
 
 ## Next steps
 
 - Private Wi-Fi/cellular connectivity and pairing.
-- Local dictation benchmarking and integration.
+- Longer dictation, multilingual model selection, and sustained battery/accuracy testing.
 - Multiple computers and projects; desktop/cloud history integration.
 - Release signing, background notifications, automatic Mac startup, and battery testing.
 - Chat deletion and retention controls. Currently the companion keeps up to 100 message entries per chat, with bounded message and diff sizes.

@@ -1,0 +1,4 @@
+<resources>
+    <string name="sms_mic">SMS microphone</string>
+    <string name="sms_mic_description">Adds a small local Whisper microphone beside the SMS composer. Android grants screen-access capability; this service uses only the Mudita SMS draft field when you choose dictation. It does not read message history, record keystrokes, or send messages. Your normal keyboard stays selected.</string>
+</resources>

@@ -1,0 +1,68 @@
+{
+  "device": "Mudita Kompakt",
+  "cpu": "4 × Cortex-A53 / MT6761V/WBB",
+  "android_api": 31,
+  "threads": 4,
+  "gpu": false,
+  "whisper_cpp_tag": "v1.9.5",
+  "charging": true,
+  "initial_battery_temperature_c": 28.2,
+  "runs": [
+    {
+      "sample": "coding-task.wav",
+      "audio_seconds": 4.5491875,
+      "model": "tiny.en F16",
+      "device_wall_seconds": 6.009676,
+      "max_rss_kib": 148928,
+      "transcript": "Create a Python script that prints hello from Compact, then run the tests."
+    },
+    {
+      "sample": "jfk.wav",
+      "audio_seconds": 11.0,
+      "model": "tiny.en F16",
+      "device_wall_seconds": 7.101675,
+      "max_rss_kib": 149500,
+      "transcript": "And so my fellow Americans ask not what your country can do for you, ask what you can do for your country."
+    },
+    {
+      "sample": "coding-task.wav",
+      "audio_seconds": 4.5491875,
+      "model": "tiny.en Q5_1",
+      "device_wall_seconds": 5.712892,
+      "max_rss_kib": 102632,
+      "transcript": "Create a Python script that prints hello from Compact, then run the tests."
+    },
+    {
+      "sample": "jfk.wav",
+      "audio_seconds": 11.0,
+      "model": "tiny.en Q5_1",
+      "device_wall_seconds": 5.735474,
+      "max_rss_kib": 103124,
+      "transcript": "And so my fellow Americans ask not what your country can do for you. Ask what you can do for your country."
+    }
+  ],
+  "app_smoke_test": {
+    "audio_seconds": 4.5491875,
+    "transcription_ms": 4885,
+    "checks": [
+      "JNI transcription",
+      "silence returns no text",
+      "active native decode cancellation",
+      "engine recovery after cancellation"
+    ],
+    "repeat_transcription_ms": 4623
+  },
+  "limitations": [
+    "Single CLI run per sample/model; not a sustained or battery benchmark.",
+    "Clean speech and a synthetic English coding sentence; these samples do not measure live-microphone accuracy.",
+    "The proper noun Kompakt was transcribed as Compact."
+  ],
+  "live_sms_test": {
+    "user_confirmed": true,
+    "dictation_inserted": true,
+    "message_sent": false,
+    "native_keyboard_restored": true,
+    "final_interface": "Single accessibility microphone; original keyboard preserved",
+    "single_button_user_confirmed": true
+  }
+}
