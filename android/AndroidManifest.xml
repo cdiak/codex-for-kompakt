@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.kompakt.remote" android:versionCode="4" android:versionName="0.3.1">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.kompakt.remote" android:versionCode="5" android:versionName="0.4.0">
+    <queries><package android:name="com.tailscale.ipn" /></queries>
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />

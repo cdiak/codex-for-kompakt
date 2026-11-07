@@ -21,9 +21,11 @@ Photos of the working prototype on the physical phone, connected to the Mac over
 
 ## Status
 
-Version **0.3.1** includes local Whisper dictation and an OpenAI blossom button for SMS. It targets a Kompakt running MuditaOS K 1.1.1 / Android 12 (API 31), with a 480 × 800 display and approximately 3 GB RAM. The development APK is about **33.4 MB**, including the speech model. The earlier UI-only 0.2 build was about 0.59 MB. The photos above show that earlier build.
+Version **0.4.0** adds private remote access over Wi-Fi or mobile data, alongside local Whisper dictation and an OpenAI blossom button for SMS. It targets a Kompakt running MuditaOS K 1.1.1 / Android 12 (API 31), with a 480 × 800 display and approximately 3 GB RAM. The development APK is about **33.4 MB**, including the speech model. The earlier UI-only 0.2 build was about 0.59 MB. The photos above show that earlier build.
 
-**USB only today.** The Mac companion listens on `127.0.0.1:39443`, and ADB reverse carries the phone's HTTPS connection to it. Wi-Fi, cellular access, and background notifications are not implemented. The Mac must remain awake, online, and running the companion.
+**Private remote access.** Tailscale connects the phone and Mac over Wi-Fi or mobile data. Tailnet-only TCP forwarding reaches the companion on `127.0.0.1:39443`; HTTPS certificate pinning and the pairing credential remain in place. USB is still available as a fallback. The Mac must remain online with Tailscale and the companion running. An optional login service starts the companion automatically and prevents idle system sleep. See [remote setup](docs/remote-access.md).
+
+Wi-Fi connectivity has been verified with the USB tunnel removed. Cellular validation is still pending: the test phone currently cannot complete ordinary HTTPS requests over its SIM's data connection. See [`verification.json`](verification.json) for the recorded checks.
 
 ## Features
 
@@ -44,7 +46,7 @@ The companion manages its own conversations in one configured project. It does n
 ```text
 Kompakt: native Java UI
     │ HTTPS + pinned host certificate + pairing credential
-    │ ADB reverse over USB
+    │ Tailscale private network (Wi-Fi/mobile data), or ADB reverse (USB)
 Mac: Python standard-library companion (localhost)
     │ JSON-RPC over stdio
 Mac: Codex app-server → selected project
@@ -78,12 +80,12 @@ python3 build.py \
   --whisper-source work/voice/whisper.cpp-1.9.5 \
   --model work/voice/ggml-tiny.en-q5_1.bin
 
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_companion
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_companion test_pairing
 ```
 
 Keep `work/android-build/development.keystore` private and retain it to sign compatible updates. Generated APKs and keys are ignored by Git.
 
-## Pair and run
+## Pair and run over USB
 
 1. Enable USB debugging on the Kompakt and authorize your Mac when prompted.
 2. Confirm that `work/toolchain/android/platform-tools/adb devices` lists the phone as authorized.
@@ -109,7 +111,7 @@ Keep `work/android-build/development.keystore` private and retain it to sign com
 
 Keep the companion's Terminal window open; Control-C stops it. After reconnecting the cable, run `./Reconnect\ Phone.command`. A Mac reboot requires restarting the companion. Use the three-bar menu for previous chats and **+** for a new chat. Finish or stop the current task before switching chats.
 
-Do not enable the pairing script's optional Wi-Fi setting without separately implementing and testing a restricted listener and access policy. It does not provide remote networking by itself.
+For wireless use, follow [remote setup](docs/remote-access.md), then select **Remote · Wi-Fi or mobile data** under the chat drawer’s **Connection** control. SSH is not required.
 
 ## Credentials and approvals
 
@@ -126,7 +128,7 @@ To revoke a phone, stop the companion, replace the pairing token, and pair only 
 - A phone-submitted task created `hello.py`, received three real approvals on the phone, and printed `Hello from Kompakt` on the Mac.
 - Saved chats reopened from the phone's drawer; a live follow-up confirmed resumed conversation context.
 - Markdown layout was visually checked on the physical e-ink display.
-- Fourteen unit tests cover task deduplication, busy guards, approval decisions and expiry, restart behavior, saved-chat persistence, and renaming.
+- Sixteen unit tests cover certificate rotation and address validation, plus task deduplication, busy guards, approval decisions and expiry, restart behavior, saved-chat persistence, and renaming.
 - The companion was restarted and both saved chats remained available.
 
 [`verification.json`](verification.json) records the prototype measurements. These are spot checks, not battery or performance benchmarks.
@@ -141,10 +143,9 @@ See [voice typing setup, measurements, and limitations](docs/voice-typing.md).
 
 ## Next steps
 
-- Private Wi-Fi/cellular connectivity and pairing.
 - Longer dictation, multilingual model selection, and sustained battery/accuracy testing.
 - Multiple computers and projects; desktop/cloud history integration.
-- Release signing, background notifications, automatic Mac startup, and battery testing.
+- Release signing, background notifications, and battery testing.
 - Chat deletion and retention controls. Currently the companion keeps up to 100 message entries per chat, with bounded message and diff sizes.
 
 The phone polls every two seconds only while foregrounded. An app-server disconnect currently requires restarting the companion.

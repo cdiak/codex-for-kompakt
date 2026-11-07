@@ -41,6 +41,7 @@ public final class MainActivity extends Activity {
     private JSONObject pairing, state;
     private String endpoint = "", token = "", requestId = "", requestText = "";
     private String lastText = "";
+    private String connectionError = "";
     private SSLSocketFactory ssl;
     private boolean foreground, polling, submitting, connected, newConversation;
     private long lastRevision = -1;
@@ -54,12 +55,13 @@ public final class MainActivity extends Activity {
                 io.execute(() -> {
                     try {
                         JSONObject snapshot = api("GET", "/state", null);
-                        runOnUiThread(() -> { connected = true; render(snapshot); });
+                        runOnUiThread(() -> { connected = true; connectionError = ""; render(snapshot); });
                     } catch (Exception e) {
                         runOnUiThread(() -> {
                             connected = false;
-                            status.setText("Mac disconnected · saved chat");
-                            status.setContentDescription(friendly(e));
+                            connectionError = friendly(e);
+                            status.setText("Mac disconnected · tap for help");
+                            status.setContentDescription(connectionError);
                             refreshButtons();
                         });
                     } finally { runOnUiThread(() -> polling = false); }
@@ -84,6 +86,13 @@ public final class MainActivity extends Activity {
         TextView title = text("Codex for Kompakt", 19); title.setTypeface(null, Typeface.BOLD);
         title.setSingleLine(true); title.setEllipsize(TextUtils.TruncateAt.END); heading.addView(title);
         status = text("Connecting to your Mac…", 12); status.setSingleLine(true); status.setEllipsize(TextUtils.TruncateAt.END);
+        status.setOnClickListener(v -> {
+            if (connected || connectionError.isEmpty()) { showConnection(); return; }
+            new AlertDialog.Builder(this).setTitle("Connection unavailable")
+                .setMessage(connectionError + "\n\nYour saved chat is still available. Check that Tailscale is connected on both devices and that each has internet access.")
+                .setPositiveButton("Connection settings", (d,w) -> showConnection())
+                .setNegativeButton("Close", null).show();
+        });
         heading.addView(status); toolbar.addView(heading, new LinearLayout.LayoutParams(0, -2, 1));
         toolbar.addView(new IconButton("new", "New chat", v -> selectChat(null)), new LinearLayout.LayoutParams(dp(42), dp(50)));
         root.addView(toolbar);
@@ -134,7 +143,14 @@ public final class MainActivity extends Activity {
             File file = new File(getFilesDir(), "pairing.json");
             pairing = new JSONObject(read(new FileInputStream(file)));
             token = pairing.getString("token");
-            endpoint = getPreferences(0).getString("endpoint", pairing.getString("usbUrl"));
+            String defaultEndpoint = remoteUrl().isEmpty() ? pairing.getString("usbUrl") : remoteUrl();
+            String configuration = pairing.optString("connectionRevision", "usb");
+            endpoint = getPreferences(0).getString("endpoint", defaultEndpoint);
+            if (!configuration.equals(getPreferences(0).getString("connectionRevision", "")) ||
+                (!endpoint.equals(pairing.getString("usbUrl")) && !endpoint.equals(remoteUrl()))) {
+                endpoint = defaultEndpoint;
+                getPreferences(0).edit().putString("endpoint", endpoint).putString("connectionRevision", configuration).apply();
+            }
             CertificateFactory cf = CertificateFactory.getInstance("X.509");
             java.security.cert.Certificate cert = cf.generateCertificate(new ByteArrayInputStream(pairing.getString("certificate").getBytes(StandardCharsets.US_ASCII)));
             KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
@@ -226,7 +242,7 @@ public final class MainActivity extends Activity {
     private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_LONG).show(); }
     private String friendly(Exception e) {
         if (e instanceof java.net.ConnectException || e instanceof java.net.SocketTimeoutException)
-            return "Mac unavailable. Check Connection and keep the companion running.";
+            return "Mac unavailable. Keep Tailscale connected on both devices and the Mac companion running.";
         if (e instanceof SSLException) return "The Mac certificate could not be verified. Pair again over USB.";
         return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
@@ -269,7 +285,7 @@ public final class MainActivity extends Activity {
     }
     private void render(JSONObject s) {
         state = s;
-        String mode = endpoint.contains("127.0.0.1") ? "USB" : "Wi-Fi";
+        String mode = endpoint.contains("127.0.0.1") ? "USB" : "Remote";
         JSONObject host = s.optJSONObject("host");
         String hostName = host == null ? "Your Mac" : host.optString("name", "Your Mac");
         status.setText(s.optString("status") + " · " + hostName + " · " + mode);
@@ -446,20 +462,26 @@ public final class MainActivity extends Activity {
                 catch(JSONException e) { toast(e.getMessage()); }
             }).show();
     }
+    private String remoteUrl() {
+        return pairing == null ? "" : pairing.optString("remoteUrl", pairing.optString("wifiUrl"));
+    }
     private void showConnection() {
         if (pairing == null) { toast("Run the USB pairing script on the Mac."); return; }
-        if (pairing.optString("wifiUrl").isEmpty()) {
+        if (remoteUrl().isEmpty()) {
             new AlertDialog.Builder(this).setTitle("USB connection")
-                .setMessage("This first build connects through the USB cable. Keep the Mac companion running. Wi-Fi and access over cellular are not configured yet.")
+                .setMessage("Remote access has not been paired yet. Set up Tailscale on both devices, then pair the Mac's private address over USB.")
                 .setPositiveButton("OK", null).show();
             return;
         }
-        String[] labels = {"USB cable", "Wi-Fi · " + pairing.optString("wifiUrl")};
+        String[] labels = {"Remote · Wi-Fi or mobile data", "USB cable"};
         new AlertDialog.Builder(this).setTitle("Connect to your Mac")
-            .setSingleChoiceItems(labels, endpoint.contains("127.0.0.1") ? 0 : 1, (dialog, which) -> {
-                endpoint = pairing.optString(which == 0 ? "usbUrl" : "wifiUrl");
+            .setSingleChoiceItems(labels, endpoint.equals(remoteUrl()) ? 0 : 1, (dialog, which) -> {
+                endpoint = which == 0 ? remoteUrl() : pairing.optString("usbUrl");
                 getPreferences(0).edit().putString("endpoint", endpoint).apply();
                 connected = false; lastRevision = -1; status.setText("Connecting…"); refreshButtons(); dialog.dismiss();
+            }).setNeutralButton("Tailscale", (d,w) -> {
+                Intent vpn = getPackageManager().getLaunchIntentForPackage("com.tailscale.ipn");
+                if (vpn != null) startActivity(vpn); else toast("Install Tailscale and sign in on both devices.");
             }).setNegativeButton("Close", null).show();
     }
     private void showText(String title, String value) {
