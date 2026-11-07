@@ -16,8 +16,8 @@
   "production_release": false,
   "app_name": "Codex",
   "in_app_title": "Codex for Kompakt",
-  "version": "0.3.0",
-  "apk_sha256": "56c342f398e62a073cd79fd314b28deef6cf2656717da16bcc20f3227b8fa463",
+  "version": "0.3.1",
+  "apk_sha256": "e77e767f76de7b9c38197a310b0cb1fdded76c534d70bcea0d1f60b36ba505b4",
   "chat_history_verified": true,
   "live_context_resume_verified": true,
   "markdown_visually_verified": [
@@ -36,5 +36,6 @@
   "sms_interface": "Optional accessibility microphone; stock Mudita keyboard",
   "sms_overlay_user_verified": true,
   "sms_overlay_test": "User confirmed microphone \u2192 record \u2192 stop \u2192 Use text \u2192 SMS draft; no message sent",
-  "ui_only_0_2_pss_kb": 44405
+  "ui_only_0_2_pss_kb": 44405,
+  "sms_button_artwork": "OpenAI blossom"
 }

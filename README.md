@@ -21,7 +21,7 @@ Photos of the working prototype on the physical phone, connected to the Mac over
 
 ## Status
 
-Version **0.3.0** adds local Whisper dictation to the native client. It targets a Kompakt running MuditaOS K 1.1.1 / Android 12 (API 31), with a 480 × 800 display and approximately 3 GB RAM. The development APK is about **33.4 MB**, including the speech model. The earlier UI-only 0.2 build was about 0.59 MB. The photos above show that earlier build.
+Version **0.3.1** includes local Whisper dictation and an OpenAI blossom button for SMS. It targets a Kompakt running MuditaOS K 1.1.1 / Android 12 (API 31), with a 480 × 800 display and approximately 3 GB RAM. The development APK is about **33.4 MB**, including the speech model. The earlier UI-only 0.2 build was about 0.59 MB. The photos above show that earlier build.
 
 **USB only today.** The Mac companion listens on `127.0.0.1:39443`, and ADB reverse carries the phone's HTTPS connection to it. Wi-Fi, cellular access, and background notifications are not implemented. The Mac must remain awake, online, and running the companion.
 

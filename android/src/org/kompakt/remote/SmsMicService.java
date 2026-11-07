@@ -58,12 +58,14 @@ public final class SmsMicService extends AccessibilityService {
         p.gravity=Gravity.TOP|Gravity.LEFT;p.x=getResources().getDisplayMetrics().widthPixels-size-dp(10);p.y=Math.max(dp(108),bounds.top-size-dp(8));
         if(microphone==null){
             microphone=new View(this){
-                final Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG);
+                final Paint pen=new Paint(Paint.ANTI_ALIAS_FLAG|Paint.FILTER_BITMAP_FLAG);
+                final Bitmap blossom=BitmapFactory.decodeResource(getResources(),R.drawable.icon);
+                final Rect artwork=new Rect(blossom.getWidth()*17/100,blossom.getHeight()*17/100,blossom.getWidth()*84/100,blossom.getHeight()*84/100);
                 @Override protected void onDraw(Canvas c){
                     float x=getWidth()/2f,y=getHeight()/2f;pen.setColor(Color.WHITE);pen.setStyle(Paint.Style.FILL);c.drawCircle(x,y,dp(21),pen);
                     pen.setColor(Color.BLACK);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(dp(1));c.drawCircle(x,y,dp(21),pen);
-                    pen.setStrokeWidth(dp(2));pen.setStrokeCap(Paint.Cap.ROUND);c.drawRoundRect(x-dp(4),y-dp(10),x+dp(4),y+dp(3),dp(4),dp(4),pen);
-                    c.drawArc(x-dp(8),y-dp(6),x+dp(8),y+dp(8),0,180,false,pen);c.drawLine(x,y+dp(8),x,y+dp(12),pen);c.drawLine(x-dp(4),y+dp(12),x+dp(4),y+dp(12),pen);
+                    pen.setStyle(Paint.Style.FILL);
+                    c.drawBitmap(blossom,artwork,new RectF(x-dp(15),y-dp(15),x+dp(15),y+dp(15)),pen);
                 }
             };
             microphone.setContentDescription("Dictate SMS draft");microphone.setOnClickListener(v->record());

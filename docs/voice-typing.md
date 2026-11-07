@@ -10,12 +10,12 @@ The recorder keeps the screen awake while recording or transcribing. Leaving its
 
 ## Dictate in Mudita Messages
 
-The same APK includes **SMS microphone**, an optional Android accessibility service that places a single microphone button just above the SMS draft field. It keeps the stock Mudita keyboard selected. There is no replacement keyboard or extra keyboard panel. It does not modify the Messages APK or request SMS/contact permissions.
+The same APK includes **SMS microphone**, an optional Android accessibility service that places a single **OpenAI blossom button** just above the SMS draft field. It keeps the stock Mudita keyboard selected. There is no replacement keyboard or extra keyboard panel. It does not modify the Messages APK or request SMS/contact permissions.
 
 1. In Codex's chat drawer, choose **SMS microphone**.
 2. Open Accessibility settings, find **SMS microphone** under installed/downloaded apps, and review Android's permission warning before enabling the service itself. Leave its separate **shortcut** disabled: that shortcut is a movable blossom that toggles the service, not the dictation microphone.
-3. Open an SMS draft and tap its message field. A small microphone appears just above the composer.
-4. Tap the microphone to record. Allow microphone access if requested. Tap **Stop recording**, review the transcript, then **Use text**.
+3. Open an SMS draft and tap its message field. The small blossom appears just above the composer.
+4. Tap the blossom to record. Allow microphone access if requested. Tap **Stop recording**, review the transcript, then **Use text**.
 5. The recorder returns to the original SMS draft and inserts the text at the saved selection. Use the normal keyboard for corrections, then send the message yourself.
 
 Accessibility is a powerful Android permission: the platform grants screen-reading and control capability. The service's code restricts retrieval and changes to the focused `com.mudita.messages:id/compose_message_text` field. It does not read message history, recipients, or keystrokes, and it never sends messages. It remembers the original draft and selection only in memory while dictation is active. Before insertion it verifies the same accessibility node/window and unchanged draft text; otherwise it refuses insertion. Leaving the recorder cancels the operation. Disable **SMS microphone** in Accessibility settings to remove the button.
