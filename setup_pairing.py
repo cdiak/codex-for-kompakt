@@ -19,15 +19,37 @@ def tailscale_ip(value):
     return str(address)
 
 
+def certificate_covers(cert, key, address):
+    """Run the phone's check in memory: pinned trust, hostname match, and expiry."""
+    server = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    server.load_cert_chain(cert, key)
+    client = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    client.load_verify_locations(cafile=str(cert))
+    to_server, to_client = ssl.MemoryBIO(), ssl.MemoryBIO()
+    ends = [client.wrap_bio(to_client, to_server, server_hostname=address),
+            server.wrap_bio(to_server, to_client, server_side=True)]
+    done = [False, False]
+    for _ in range(20):
+        for i, end in enumerate(ends):
+            if not done[i]:
+                try:
+                    end.do_handshake()
+                    done[i] = True
+                except ssl.SSLWantReadError:
+                    pass
+                except ssl.SSLError:
+                    return False
+        if all(done):
+            return True
+    return False
+
+
 def ensure_certificate(runtime, addresses, rotate=False):
     cert, key = runtime / 'server.crt', runtime / 'server.key'
     if cert.exists() and key.exists() and not rotate:
-        decoded = ssl._ssl._test_decode_cert(str(cert))
         for address in addresses:
-            try:
-                ssl.match_hostname(decoded, address)
-            except ssl.CertificateError as error:
-                raise ValueError('Certificate does not cover the connection address. Stop the companion, then use --rotate-certificate and pair again.') from error
+            if not certificate_covers(cert, key, address):
+                raise ValueError('Certificate has expired or does not cover the connection address. Stop the companion, then use --rotate-certificate and pair again.')
         return cert
     if (cert.exists() or key.exists()) and not rotate:
         raise ValueError('Incomplete TLS credentials. Use --rotate-certificate after stopping the companion.')

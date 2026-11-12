@@ -26,6 +26,10 @@ def atomic_json(path, value):
     os.replace(temp, path)
 
 
+class Unconfirmed(RuntimeError):
+    """Codex did not answer in time; the request may still have taken effect."""
+
+
 class Rpc:
     def __init__(self, binary, runtime, notification, request, disconnected):
         self.notification, self.request, self.disconnected = notification, request, disconnected
@@ -59,7 +63,7 @@ class Rpc:
         try:
             self.send({'id': key, 'method': method, 'params': params})
             if not pending['event'].wait(timeout):
-                raise RuntimeError('Codex did not confirm the request. Check the task before retrying.')
+                raise Unconfirmed('Codex did not confirm the request. Check the task before retrying.')
             message = pending['message']
             if 'error' in message:
                 raise RuntimeError(message['error'].get('message', 'Codex request failed'))
@@ -71,18 +75,24 @@ class Rpc:
     def read(self):
         try:
             for line in self.process.stdout:
-                message = json.loads(line)
-                if 'method' in message:
-                    if 'id' in message:
-                        self.request(message)
+                # One malformed line or unexpected event must not end the session.
+                try:
+                    message = json.loads(line)
+                    if not isinstance(message, dict):
+                        continue
+                    if 'method' in message:
+                        if 'id' in message:
+                            self.request(message)
+                        else:
+                            self.notification(message)
                     else:
-                        self.notification(message)
-                else:
-                    with self.lock:
-                        pending = self.waiting.get(message.get('id'))
-                        if pending:
-                            pending['message'] = message
-                            pending['event'].set()
+                        with self.lock:
+                            pending = self.waiting.get(message.get('id'))
+                            if pending:
+                                pending['message'] = message
+                                pending['event'].set()
+                except Exception as error:
+                    print('Ignored a Codex message:', type(error).__name__, flush=True)
         except Exception as error:
             print('Codex connection failed:', type(error).__name__, flush=True)
         finally:
@@ -111,6 +121,7 @@ class Bridge:
         self.pending = {}
         self.seen = {}
         self.loaded = False
+        self.on_disconnect = None
         self.chats_path = self.runtime / 'chats.json'
         self.chats = json.loads(self.chats_path.read_text()) if self.chats_path.exists() else {}
         try:
@@ -156,6 +167,8 @@ class Bridge:
             self.chats[self.state['threadId']] = {k: copy.deepcopy(self.state.get(k)) for k in fields}
         atomic_json(self.chats_path, self.chats)
         data = copy.deepcopy(self.state)
+        for key in list(self.seen)[:-500]:
+            del self.seen[key]
         data['_seen'] = self.seen
         atomic_json(self.runtime / 'state.json', data)
 
@@ -216,6 +229,8 @@ class Bridge:
             self.pending.clear()
             self.state.update(status='Codex disconnected', busy=False, turnId=None)
             self.save()
+        if self.on_disconnect:
+            self.on_disconnect()
 
     def notify(self, event):
         method, p = event['method'], event.get('params') or {}
@@ -319,6 +334,10 @@ class Bridge:
                 return {'accepted': True}
             except Exception as error:
                 with self.lock:
+                    # A definite failure may be retried with the same request ID.
+                    # An unconfirmed request may have started, so it stays recorded.
+                    if not isinstance(error, Unconfirmed):
+                        self.seen.pop(request_id, None)
                     self.state.update(busy=False, status='Request failed')
                     self.message('failure-' + request_id, 'system', str(error))
                     self.save()
@@ -380,7 +399,7 @@ def handler(bridge, token):
 
         def authorized(self):
             return not self.headers.get('Origin') and hmac.compare_digest(
-                self.headers.get('Authorization', ''), 'Bearer ' + token)
+                self.headers.get('Authorization', '').encode(), ('Bearer ' + token).encode())
 
         def do_GET(self):
             if not self.authorized():
@@ -424,6 +443,32 @@ def handler(bridge, token):
     return Handler
 
 
+class Server(ThreadingHTTPServer):
+    """HTTPS server that runs each TLS handshake in the connection's own thread.
+
+    Wrapping the listening socket would run handshakes in the accept loop, where
+    one silent client blocks every other request.
+    """
+    daemon_threads = True
+
+    def __init__(self, address, handler_class, context, timeout=60):
+        self.context, self.client_timeout = context, timeout
+        super().__init__(address, handler_class)
+
+    def finish_request(self, request, client_address):
+        request.settimeout(self.client_timeout)
+        try:
+            secure = self.context.wrap_socket(request, server_side=True)
+        except OSError:
+            return
+        try:
+            super().finish_request(secure, client_address)
+        except OSError:
+            pass
+        finally:
+            secure.close()
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--runtime', type=Path, required=True)
@@ -450,20 +495,32 @@ def main():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(args.runtime / 'server.crt', args.runtime / 'server.key')
-    server = ThreadingHTTPServer((args.bind, args.port), handler(bridge, token))
-    server.socket = context.wrap_socket(server.socket, server_side=True)
+    server = Server((args.bind, args.port), handler(bridge, token), context)
+    stopping, lost = threading.Event(), threading.Event()
     def stop(*_):
+        stopping.set()
         threading.Thread(target=server.shutdown, daemon=True).start()
+    def codex_lost():
+        # Exit so that a login service restarts the companion with a new Codex.
+        if not stopping.is_set():
+            lost.set()
+            stop()
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
+    bridge.on_disconnect = codex_lost
+    if bridge.rpc.closed:
+        codex_lost()
     print('Kompakt companion ready on HTTPS port', args.port, flush=True)
     (args.runtime / 'companion.pid').write_text(str(os.getpid()))
     try:
         server.serve_forever()
     finally:
+        stopping.set()
         server.server_close()
         bridge.rpc.stop()
         (args.runtime / 'companion.pid').unlink(missing_ok=True)
+    if lost.is_set():
+        raise SystemExit('Codex stopped. Start the companion again.')
 
 
 if __name__ == '__main__':

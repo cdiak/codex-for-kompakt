@@ -128,7 +128,7 @@ To revoke a phone, stop the companion, replace the pairing token, and pair only 
 - A phone-submitted task created `hello.py`, received three real approvals on the phone, and printed `Hello from Kompakt` on the Mac.
 - Saved chats reopened from the phone's drawer; a live follow-up confirmed resumed conversation context.
 - Markdown layout was visually checked on the physical e-ink display.
-- Sixteen unit tests cover certificate rotation and address validation, plus task deduplication, busy guards, approval decisions and expiry, restart behavior, saved-chat persistence, and renaming.
+- Twenty-three unit tests cover certificate rotation and address validation, plus task deduplication and retry, busy guards, approval decisions and expiry, restart behavior, saved-chat persistence, renaming, malformed app-server messages, and a silent TLS client.
 - The companion was restarted and both saved chats remained available.
 
 [`verification.json`](verification.json) records the prototype measurements. These are spot checks, not battery or performance benchmarks.
@@ -148,6 +148,6 @@ See [voice typing setup, measurements, and limitations](docs/voice-typing.md).
 - Release signing, background notifications, and battery testing.
 - Chat deletion and retention controls. Currently the companion keeps up to 100 message entries per chat, with bounded message and diff sizes.
 
-The phone polls every two seconds only while foregrounded. An app-server disconnect currently requires restarting the companion.
+The phone polls every two seconds only while foregrounded. If the app-server disconnects, the companion exits. The login service then restarts it; a manual companion must be started again.
 
 See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for dependency and artwork attribution.

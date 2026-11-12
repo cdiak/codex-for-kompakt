@@ -1,8 +1,14 @@
+import http.client
 import json
+import os
 from pathlib import Path
+import socket
+import ssl
 import tempfile
+import threading
 import unittest
-from companion import Bridge
+from companion import Bridge, Rpc, Server, Unconfirmed, handler
+from setup_pairing import ensure_certificate
 
 
 class FakeRpc:
@@ -10,8 +16,11 @@ class FakeRpc:
         self.sent, self.calls = [], []
         self.notify = notify
         self.counter = 0
+        self.fail, self.fail_with = None, RuntimeError
     def call(self, method, params, timeout=45):
         self.calls.append((method, params))
+        if method == self.fail:
+            raise self.fail_with('simulated failure')
         if method == 'account/read': return {'account': {'type': 'chatgpt'}}
         if method == 'thread/start':
             self.counter += 1
@@ -115,6 +124,91 @@ class BridgeTests(unittest.TestCase):
         self.bridge.rename_chat({'id':key,'title':'Renamed from new chat'})
         recovered=Bridge(self.path,self.path/'project','fake',FakeRpc)
         self.assertEqual(recovered.chat_list()['hosts'][0]['chats'][0]['title'],'Renamed from new chat')
+    def test_failed_task_can_be_retried_with_same_request_id(self):
+        body = {'prompt':'retry me','requestId':'retry-0001'}
+        self.bridge.rpc.fail = 'turn/start'
+        with self.assertRaises(RuntimeError): self.bridge.task(body)
+        self.assertFalse(self.bridge.snapshot()['busy'])
+        self.bridge.rpc.fail = None
+        self.assertNotIn('duplicate', self.bridge.task(body))
+        self.assertEqual(sum(m=='turn/start' for m,p in self.bridge.rpc.calls),2)
+        prompts=[m for m in self.bridge.snapshot()['messages'] if m['role']=='you']
+        self.assertEqual(len(prompts),1)
+    def test_unconfirmed_task_is_not_reexecuted(self):
+        body = {'prompt':'maybe started','requestId':'maybe-0001'}
+        self.bridge.rpc.fail, self.bridge.rpc.fail_with = 'turn/start', Unconfirmed
+        with self.assertRaises(Unconfirmed): self.bridge.task(body)
+        self.bridge.rpc.fail = None
+        self.assertTrue(self.bridge.task(body)['duplicate'])
+    def test_seen_request_ids_are_bounded(self):
+        self.bridge.seen = {'old-%04d' % i: 'submitted' for i in range(600)}
+        self.bridge.save()
+        self.assertEqual(len(self.bridge.seen),500)
+        self.assertIn('old-0599', self.bridge.seen)
+    def test_disconnect_notifies_owner(self):
+        called=[]
+        self.bridge.on_disconnect=lambda: called.append(True)
+        self.bridge.disconnected()
+        self.assertEqual(called,[True])
+        self.assertEqual(self.bridge.snapshot()['status'],'Codex disconnected')
+
+
+FAKE_CODEX = '''#!/usr/bin/env python3
+import json, sys
+print('not json', flush=True)
+print('[1]', flush=True)
+print(json.dumps({'method': 'surprise'}), flush=True)
+for line in sys.stdin:
+    message = json.loads(line)
+    if 'id' in message:
+        print(json.dumps({'id': message['id'], 'result': {'ok': True}}), flush=True)
+'''
+
+
+class RpcTests(unittest.TestCase):
+    def test_reader_survives_bad_messages_and_reports_exit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = Path(directory)
+            binary = runtime/'fake-codex'
+            binary.write_text(FAKE_CODEX); os.chmod(binary, 0o700)
+            gone = threading.Event()
+            def explode(message): raise KeyError('unexpected shape')
+            rpc = Rpc(str(binary), runtime, explode, explode, gone.set)
+            self.assertEqual(rpc.call('anything', {}, timeout=10), {'ok': True})
+            rpc.stop()
+            self.assertTrue(gone.wait(10))
+            rpc.process.stdin.close(); rpc.process.stdout.close()
+
+
+class ServerTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        path = Path(self.temp.name)
+        certificate = ensure_certificate(path, ['127.0.0.1'])
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(certificate, path/'server.key')
+        self.trust = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        self.trust.load_verify_locations(cafile=str(certificate))
+        bridge = Bridge(path, path/'project', 'fake', FakeRpc)
+        self.server = Server(('127.0.0.1', 0), handler(bridge, 'secret'), context, timeout=5)
+        self.port = self.server.server_address[1]
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+    def tearDown(self):
+        self.server.shutdown(); self.server.server_close(); self.temp.cleanup()
+    def status(self, authorization):
+        connection = http.client.HTTPSConnection('127.0.0.1', self.port, context=self.trust, timeout=5)
+        try:
+            connection.request('GET', '/state', headers={'Authorization': authorization})
+            return connection.getresponse().status
+        finally: connection.close()
+    def test_silent_client_does_not_block_other_requests(self):
+        silent = socket.create_connection(('127.0.0.1', self.port))
+        try: self.assertEqual(self.status('Bearer secret'), 200)
+        finally: silent.close()
+    def test_wrong_or_malformed_credentials_are_rejected(self):
+        self.assertEqual(self.status('Bearer wrong'), 401)
+        self.assertEqual(self.status('Bearer secr\xe9t'), 401)
+        self.assertEqual(self.status('Bearer secret'), 200)
 
 
 if __name__ == '__main__': unittest.main()
